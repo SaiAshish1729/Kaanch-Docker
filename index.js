@@ -89,7 +89,72 @@ async function checkAndSyncBlocks() {
     setTimeout(checkAndSyncBlocks, 1000);
 }
 
-checkAndSyncBlocks();
+// checkAndSyncBlocks();
+
+// user logic
+app.post("/get-resp", async (req, res) => {
+    try {
+        const { method, params } = req.body;
+        if (!method || method === "") {
+            return res.status(400).json({ message: "'method' is required." })
+        }
+        const txHash = params[0];
+
+        if (method == "eth_getTransactionReceipt" || method == "eth_getTransactionByHash") {
+            const checkTx = await db.collection("transaction").findOne({
+                transactions: txHash,
+            });
+
+            if (checkTx) {
+                return res.status(200).json({
+                    success: true,
+                    message: "Transaction found in block.",
+                    data: checkTx
+                });
+            } else {
+                return res.status(404).json({ success: false, message: "Transaction hash not found in any block." });
+            }
+
+        } else if (method == "kaanch_getblockdata") {
+            const checkTx = await db.collection("block").findOne({
+                $or: [
+                    { blockNumber: Number(txHash) },
+                    { blockHash: txHash }
+                ]
+            });
+            if (checkTx) {
+                return res.status(200).json({
+                    success: true,
+                    message: "Record found in block.",
+                    data: checkTx
+                });
+            } else {
+                return res.status(404).json({ success: false, message: "blockNumber or blockHash hash not found in any block." });
+            }
+        } else if (method == "eth_getBlockByNumber") {
+            // const { blockNumber } = req.body;
+            const blockNumberinDecimal = parseInt(txHash, 16);
+            const checkTx = await db.collection("block").findOne({ blockNumber: blockNumberinDecimal });
+            if (checkTx) {
+                return res.status(200).json({
+                    success: true,
+                    message: "Record found in block.",
+                    data: checkTx
+                });
+            } else {
+                return res.status(404).json({ success: false, message: "blockNumber or blockHash hash not found in any block." });
+            }
+        } else {
+            const payload = req.body;
+            const resp = await axios.post("https://rpc.kaanch.network", payload);
+            return res.status(200).send({ data: resp.data });
+        }
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ message: "Error while fetching response.", error });
+    }
+})
 
 app.get("/", (req, res) => {
     res.send({ message: "Hello from Kaanch docker." })
