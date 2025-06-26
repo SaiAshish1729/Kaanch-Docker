@@ -10,6 +10,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const MONGO_URL = "mongodb://admin:password@localhost:27017";
+// const MONGO_URL = "mongodb://admin:password@kaanch-mongo:27017";
+
 
 let db;
 async function startServer() {
@@ -22,6 +24,7 @@ async function startServer() {
         app.listen(port, () => {
             console.log(`🚀 Proxy server running at http://localhost:${port}`);
         });
+        // checkAndSyncBlocks();
     } catch (err) {
         console.error("❌ Failed to start server:", err.message);
         process.exit(1);
@@ -94,7 +97,7 @@ async function checkAndSyncBlocks() {
     setTimeout(checkAndSyncBlocks, 1000);
 }
 
-checkAndSyncBlocks();
+// checkAndSyncBlocks();
 
 // user logic
 app.post("/get-resp", async (req, res) => {
@@ -106,53 +109,102 @@ app.post("/get-resp", async (req, res) => {
         const txHash = params[0];
 
         if (method == "eth_getTransactionReceipt" || method == "eth_getTransactionByHash") {
-            const checkTx = await db.collection("transaction").findOne({
-                transactions: txHash,
-            });
-
+            const checkTx = await db.collection("transaction").findOne(
+                { transactions: txHash, },
+                { projection: { _id: 0 } }
+            );
             if (checkTx) {
                 return res.status(200).json({
                     success: true,
-                    message: "Transaction found in block.",
-                    data: checkTx
+                    jsonrpc: req.body.jsonrpc,
+                    id: req.body.id,
+                    result: checkTx
                 });
             } else {
-                return res.status(404).json({ success: false, message: "Transaction hash not found in any block." });
+                // return res.status(404).json({ success: false, message: "Transaction hash not found in any block." });
+                const payload = req.body;
+                const resp = await axios.post("https://rpc.kaanch.network", payload, {
+                    headers: { "Content-Type": "application/json" },
+                    validateStatus: function (status) {
+                        // Accept all statuses, even 404 — we'll inspect the body ourselves
+                        return status >= 200 && status < 600;
+                    }
+                });
+
+                // console.log("📥 RPC HTTP Status:", resp.status);
+                // console.log("📥 RPC Response Body:", resp.data);
+                return res.status(200).json(resp.data);
             }
 
         } else if (method == "kaanch_getblockdata") {
-            const checkTx = await db.collection("block").findOne({
-                $or: [
-                    { blockNumber: Number(txHash) },
-                    { blockHash: txHash }
-                ]
-            });
+            const checkTx = await db.collection("block").findOne(
+                {
+                    $or: [
+                        { blockNumber: Number(txHash) },
+                        { blockHash: txHash }
+                    ]
+                },
+                { projection: { _id: 0 } });
             if (checkTx) {
                 return res.status(200).json({
                     success: true,
-                    message: "Record found in block.",
-                    data: checkTx
+                    jsonrpc: req.body.jsonrpc,
+                    id: req.body.id,
+                    result: checkTx
                 });
             } else {
-                return res.status(404).json({ success: false, message: "blockNumber or blockHash hash not found in any block." });
+                // return res.status(404).json({ success: false, message: "blockNumber or blockHash hash not found in any block." });
+                const payload = req.body;
+                const resp = await axios.post("https://rpc.kaanch.network", payload, {
+                    headers: { "Content-Type": "application/json" },
+                    validateStatus: function (status) {
+                        // Accept all statuses, even 404 — we'll inspect the body ourselves
+                        return status >= 200 && status < 600;
+                    }
+                });
+
+                // console.log("📥 RPC HTTP Status:", resp.status);
+                // console.log("📥 RPC Response Body:", resp.data);
+                return res.status(200).json(resp.data);
             }
         } else if (method == "eth_getBlockByNumber") {
-            // const { blockNumber } = req.body;
             const blockNumberinDecimal = parseInt(txHash, 16);
-            const checkTx = await db.collection("block").findOne({ blockNumber: blockNumberinDecimal });
+            const checkTx = await db.collection("block").findOne({ blockNumber: blockNumberinDecimal }, { projection: { _id: 0 } });
             if (checkTx) {
                 return res.status(200).json({
                     success: true,
-                    message: "Record found in block.",
-                    data: checkTx
+                    jsonrpc: req.body.jsonrpc,
+                    id: req.body.id,
+                    result: checkTx
                 });
             } else {
-                return res.status(404).json({ success: false, message: "blockNumber or blockHash hash not found in any block." });
+                // return res.status(404).json({ success: false, message: "blockNumber or blockHash hash not found in any block." });
+                const payload = req.body;
+                const resp = await axios.post("https://rpc.kaanch.network", payload, {
+                    headers: { "Content-Type": "application/json" },
+                    validateStatus: function (status) {
+                        // Accept all statuses, even 404 — we'll inspect the body ourselves
+                        return status >= 200 && status < 600;
+                    }
+                });
+
+                // console.log("📥 RPC HTTP Status:", resp.status);
+                // console.log("📥 RPC Response Body:", resp.data);
+                return res.status(200).json(resp.data);
             }
         } else {
             const payload = req.body;
-            const resp = await axios.post("https://rpc.kaanch.network", payload);
-            return res.status(200).send({ data: resp.data });
+            const resp = await axios.post("https://rpc.kaanch.network", payload, {
+                headers: { "Content-Type": "application/json" },
+                validateStatus: function (status) {
+                    // Accept all statuses, even 404 — we'll inspect the body ourselves
+                    return status >= 200 && status < 600;
+                }
+            });
+
+            // console.log("📥 RPC HTTP Status:", resp.status);
+            // console.log("📥 RPC Response Body:", resp.data);
+            return res.status(200).json(resp.data);
         }
 
     } catch (error) {
