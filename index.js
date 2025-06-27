@@ -100,7 +100,7 @@ async function checkAndSyncBlocks() {
 // checkAndSyncBlocks();
 
 // user logic
-app.post("/get-resp", async (req, res) => {
+app.post("/", async (req, res) => {
     try {
         const { method, params } = req.body;
         if (!method || method === "") {
